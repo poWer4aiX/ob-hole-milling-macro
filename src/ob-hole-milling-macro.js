@@ -1,6 +1,6 @@
 
 function generateGCode(holeDiam, endmillDiam, zMovement, stepDown, feedrate, mode) {
-  if (holeDiam < endmillDiam || zMovement <= 0) {
+  if (holeDiam < endmillDiam || zMovement <= 0 || stepDown <= 0) {
     return;
   }
 
@@ -144,14 +144,14 @@ function genSelectHtml(label, id, options, descr='', opt='') {
 
 // Dialog creation
 Metro.dialog.create({
-  title: 'Hole',
+  title: 'Hole Milling',
   content:
     genInputHtml('Hole diameter', 'holeDiam', 6, 'fa-circle', '') +
     genInputHtml('Endmill diameter', 'endmillDiam', 4, 'fa-circle', '') +
     genInputHtml('Cutting depth', 'zMovement', 10, 'fa-ruler', '') +
     genInputHtml('Step-down', 'stepDown', 1, 'fa-align-justify', '') +
     genInputHtml('Feedrate', 'feedrate', 100, 'fa-running', 'How fast to move the endmill in milling operation') +
-    genSelectHtml('Mode', 'mode', ['zigzag', 'to-outer', 'to-center']),
+    genSelectHtml('Mode', 'mode', ['zig-zag', 'to-outer', 'to-center']),
     actions: [
     {
       caption: "Generate G-Code",
@@ -173,4 +173,7 @@ Metro.dialog.create({
     }
   ]
 });
-module.exports = generateGCode;
+
+// required for jest test 
+if (process.env.JEST_WORKER_ID !== undefined)
+  module.exports = generateGCode;
