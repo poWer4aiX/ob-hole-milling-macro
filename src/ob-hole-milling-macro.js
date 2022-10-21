@@ -181,13 +181,13 @@ Metro.dialog.create({
       onclick: function () {
         prefs.holeDiam = parseFloat($("#holeDiam").val())
         prefs.endmillDiam = parseFloat($("#endmillDiam").val())
-        prefs.zMovement = parseFloat($("#zMovement").val())
+        prefs.holeDepth = parseFloat($("#zMovement").val())
         prefs.doc = parseFloat($("#doc").val())
         prefs.woc = parseFloat($("#woc").val())
         //const stepDown = parseFloat($("#stepDown").val())
         prefs.feedrate = parseInt($("#feedrate").val())
         prefs.receipe = $('#receipe').val();
-        const gCode = generateGCode(prefs.holeDiam, prefs.endmillDiam, prefs.zMovement, prefs.doc, prefs.woc, prefs.feedrate, prefs.receipe)
+        const gCode = generateGCode(prefs.holeDiam, prefs.endmillDiam, prefs.holeDepth, prefs.doc, prefs.woc, prefs.feedrate, prefs.receipe)
         if (gCode)
           savePrefs();
       }
