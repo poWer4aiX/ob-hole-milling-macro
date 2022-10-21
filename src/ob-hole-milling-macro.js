@@ -150,31 +150,46 @@ function genSelectHtml(label, id, options, descr = '', opt = '') {
   return html
 }
 
+var prefs = {
+  holeDiam: 8,
+  endmillDiam: 4,
+  holeDepth: 1,
+  doc: 100,
+  woc: 20,
+  feedrate: 500
+}
+
+function loadPrefs() { if (window.tmp_prefs_macro_hole_milling) prefs = window.tmp_prefs_macro_hole_milling }
+function savePrefs() { window.tmp_prefs_macro_hole_milling = prefs }
+loadPrefs();
+
 // Dialog creation
 Metro.dialog.create({
   title: 'Hole Milling',
   content:
-    genInputHtml('Hole diameter', 'holeDiam', 8, 'fa-circle', '') +
-    genInputHtml('Endmill diameter', 'endmillDiam', 4, 'fa-circle', '') +
-    genInputHtml('Cutting depth', 'zMovement', 10, 'fa-ruler', '') +
-    genInputHtml('DOC', 'doc', 100, 'fa-align-justify', 'depth of cut (10% - 200% of endmill diameter)', "%") +
-    genInputHtml('WOC', 'woc', 20, 'fa-align-justify', 'width of cut (5% - 30% of endmill diameter)', "%") +
+    genInputHtml('Hole diameter', 'holeDiam', prefs.holeDiam, 'fa-circle', '') +
+    genInputHtml('Endmill diameter', 'endmillDiam', prefs.endmillDiam, 'fa-circle', '') +
+    genInputHtml('Cutting depth', 'zMovement', prefs.holeDepth, 'fa-ruler', '') +
+    genInputHtml('DOC', 'doc', prefs.doc, 'fa-align-justify', 'depth of cut (10% - 200% of endmill diameter)', "%") +
+    genInputHtml('WOC', 'woc', prefs.woc, 'fa-align-justify', 'width of cut (5% - 30% of endmill diameter)', "%") +
     //    genInputHtml('Step-down', 'stepDown', 1, 'fa-align-justify', '') +
-    genInputHtml('Feedrate', 'feedrate', 100, 'fa-running', 'How fast to move the endmill in milling operation'),
+    genInputHtml('Feedrate', 'feedrate', prefs.feedrate, 'fa-running', 'How fast to move the endmill in milling operation'),
   actions: [
     {
       caption: "Generate G-Code",
       cls: "js-dialog-close success",
       onclick: function () {
-        const holeDiam = parseFloat($("#holeDiam").val())
-        const endmillDiam = parseFloat($("#endmillDiam").val())
-        const zMovement = parseFloat($("#zMovement").val())
-        const doc = parseFloat($("#doc").val())
-        const woc = parseFloat($("#woc").val())
+        prefs.holeDiam = parseFloat($("#holeDiam").val())
+        prefs.endmillDiam = parseFloat($("#endmillDiam").val())
+        prefs.zMovement = parseFloat($("#zMovement").val())
+        prefs.doc = parseFloat($("#doc").val())
+        prefs.woc = parseFloat($("#woc").val())
         //const stepDown = parseFloat($("#stepDown").val())
-        const feedrate = parseInt($("#feedrate").val())
-        const mode = $('#mode').val();
-        generateGCode(holeDiam, endmillDiam, zMovement, doc, woc, feedrate, mode)
+        prefs.feedrate = parseInt($("#feedrate").val())
+        prefs.receipe = $('#receipe').val();
+        const gCode = generateGCode(prefs.holeDiam, prefs.endmillDiam, prefs.zMovement, prefs.doc, prefs.woc, prefs.feedrate, prefs.receipe)
+        if (gCode)
+          savePrefs();
       }
     }, {
       caption: "Cancel",
