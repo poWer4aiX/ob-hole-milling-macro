@@ -238,7 +238,7 @@ var prefs = {
   woc: 20,
   wocFinish: 2,
   feedrate: 500,
-  receipe: "spiral-ccw"
+  receipe: "spiral-ccw-ccw"
 }
 
 function loadPrefs() { if (window.tmp_prefs_macro_hole_milling) prefs = window.tmp_prefs_macro_hole_milling }
