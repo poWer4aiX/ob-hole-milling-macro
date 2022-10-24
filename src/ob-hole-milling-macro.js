@@ -1,11 +1,66 @@
+function millSpiral(diam, ccw, stepWidth, g, xyFeed) {
+  function f(x) { return Number(x).toFixed(6).replace(/\.?0+$/, '') }
+  // see https://math.stackexchange.com/questions/1781438/finding-the-center-of-a-circle-given-two-points-and-a-radius-algebraically
+  const microSteps = 8
+  const d = stepWidth / 4
 
-function generateGCode(holeDiam, endmillDiam, zMovement, doc, woc, feedrate, receipe) {
+  var step = 0
+  // current point
+  var xCurr = 0.0
+  var yCurr = 0
+  // target point
+  var xTarget = 0.0
+  var yTarget = 0.0
+  // target radius
+  var rTarget = 0.0
+
+  var state = 0
+  var remainingClosingCount = 5
+  while (rTarget < diam || remainingClosingCount) {
+    step++
+    rTarget = (step > 1 ? step - 0.5 : step) * d;
+    if (rTarget > diam) rTarget = diam
+    var xyTarget = step * d;
+    if (xyTarget > diam) xyTarget = diam
+    switch (state) {
+      case 0: xTarget = xyTarget * -1; yTarget = 0; break;  // arc top left
+      case 1: xTarget = 0; yTarget = xyTarget * -1; break;  // arc bottom left
+      case 2: xTarget = xyTarget; yTarget = 0; break; // arc bottom right
+      case 3: xTarget = 0; yTarget = xyTarget; break; // arc top right
+    }
+    // distance to center of rhombus
+    const xa = 1 / 2 * (xTarget - xCurr)
+    const ya = 1 / 2 * (yTarget - yCurr)
+    // center of rhombus
+    const x0 = xCurr + xa
+    const y0 = yCurr + ya
+    // half lenth of diagonales of rhombus
+    const a = Math.sqrt(xa * xa + ya * ya)
+    const b = Math.sqrt(rTarget * rTarget - a * a)
+    // center of circle
+    const xCenter = x0 + (ccw ? -1 : 1) * ((b * ya) / a)
+    const yCenter = y0 + (ccw ? 1 : -1) * ((b * xa) / a)
+    g(`G${ccw ? 3 : 2} F${xyFeed} X${f(xTarget)} Y${f(yTarget)} I${f(xCenter - xCurr)} J${f(yCenter - yCurr)}`)
+
+    xCurr = xTarget
+    yCurr = yTarget
+    state += ccw ? 1 : -1
+    if (state < 0) state = 3
+    if (state > 3) state = 0
+
+    if (rTarget >= diam)
+      remainingClosingCount--
+  }
+}
+
+function generateGCode(holeDiam, endmillDiam, zMovement, doc, woc, wocFinish, feedrate, receipe) {
   if (holeDiam < endmillDiam) { console.log("holeDiam < endmillDiam"); return }
   if (zMovement <= 0) { console.log("zMovement <=0"); return }
   if (doc < 10) { console.log("doc < 10"); return }
   if (doc > 200) { console.log("doc > 200"); return }
   if (woc < 5) { console.log("woc < 5"); return }
   if (woc > 30) { console.log("woc > 30"); return }
+  if (wocFinish < 0) wocFinish=0
 
   var x0 = 0
   var y0 = 0
@@ -18,7 +73,7 @@ function generateGCode(holeDiam, endmillDiam, zMovement, doc, woc, feedrate, rec
   var xyFeed = feedrate
   var zFeed = feedrate / 2
   var xStep = endmillDiam * woc / 100;
-  var finishOffset = 0.2; // mm
+  var finishOffset = endmillDiam * wocFinish / 100; 
   var xMax = (holeDiam - endmillDiam - finishOffset) / 2
   if (xMax < 0) xMax = 0
   var xMax2 = (holeDiam - endmillDiam) / 2
@@ -48,45 +103,30 @@ function generateGCode(holeDiam, endmillDiam, zMovement, doc, woc, feedrate, rec
     g(`; layer ${z}`)
     g(`G1 F${zFeed} Z${z}; step down on current position`)
 
-    if (receipe == 'circle') {
+    const ccw = (() => {
+      if (/^\w*-ccw/.test(receipe)) return 1
+      else if (/^\w*-cw/.test(receipe)) return 0
+      else return 1
+    })()
+    if (/^circle/.test(receipe)) {
       // x/y movement for circle milling
       while (x < xMax) {
         x += xStep
         if (x > xMax) x = xMax
         g(`G1 F${xyFeed} X${x} Y0; move to x/y`)
         if (x > 0) {
-          g(`G2 F${xyFeed} X-${x} Y0 I-${x} J0; 1st half circle`)
-          g(`G2 F${xyFeed} X${x} Y0 I${x} J0; 2nd half circle`)
+          if (ccw) {
+            g(`G3 F${xyFeed} X-${x} Y0 I-${x} J0; 1st half circle`)
+            g(`G3 F${xyFeed} X${x} Y0 I${x} J0; 2nd half circle`)
+          } else {
+            g(`G2 F${xyFeed} X-${x} Y0 I-${x} J0; 1st half circle`)
+            g(`G2 F${xyFeed} X${x} Y0 I${x} J0; 2nd half circle`)
+          }
         }
         if (x >= xMax) break
       }
     } else if (/^spiral/.test(receipe)) {
-      var state = 0
-      var d = 0
-      var closingCount = 5
-      var dir = 'cw'
-      if (/^spiral cw/.test(receipe))
-        dir = 'cw'
-      else if (/^spiral ccw/.test(receipe))
-        dir = 'ccw'
-      while (d < xMax || closingCount > 0) {
-        d += xStep / 4
-        if (d > xMax) d = xMax
-        switch (state) {
-          case 0: x = 0; y = d; break;
-          case 1: x = d; y = 0; break;
-          case 2: x = 0; y = -d; break;
-          case 3: x = -d; y = 0; break;
-        }
-        if (dir == 'cw') {
-          g(`G2 F${xyFeed} X${x} Y${y} R${d - xStep / 4 / 2}`)
-          if (++state > 3) state = 0
-        } else {
-          g(`G3 F${xyFeed} X${x} Y${y} R${d - xStep / 4 / 2}`)
-          if (--state < 0) state = 3
-        }
-        if (d >= xMax && --closingCount <= 0) break
-      }
+      millSpiral(xMax, ccw, xStep, g, xyFeed)
     } else {
       console.log(`unknown receipe:${receipe}`)
       return
@@ -100,13 +140,19 @@ function generateGCode(holeDiam, endmillDiam, zMovement, doc, woc, feedrate, rec
       break
   }
 
-  // if we are not only drilling, then add a finishing cut
+  // if we are not only drilling and not having a wocFinish of 0, then add a finishing cut
   if (xMax2 > xMax) {
-    // finishing cut
     g('')
-    g(';--- finishing cut with DOC=200')
+    g(`;--- finishing cut with DOC=200%, WOC=${wocFinish}%`)
+    g(`G0 Z${z0 + zSafe}; move to z-safe height`)
+    g(`G0 F1000 X0 Y0 Z0; move up to zeropoint`)
     z = z0
     stepDown = endmillDiam * 200 / 100;
+    const ccw = (() => {
+      if (/^\w*-\w*-ccw/.test(receipe)) return 1
+      else if (/^\w*-\w*-cw/.test(receipe)) return 0
+      else return 1
+    })() 
     //g(`G1 F${zFeed} Z${z}; go back to z0`)
     while (z >= -zMovement) {
       // step down
@@ -118,10 +164,15 @@ function generateGCode(holeDiam, endmillDiam, zMovement, doc, woc, feedrate, rec
       // move to outer pos
       if (x != xMax2) {
         x = xMax2
-        g(`G1 F${xyFeed} X${x} Y0; move to outer finishing pos`)
+        g(`G1 F${xyFeed/2} X${x} Y0; move to outer finishing pos`)
       }
-      g(`G3 F${xyFeed} X-${x} Y0 I-${x} J0; 1st half circle`)
-      g(`G3 F${xyFeed} X${x} Y0 I${x} J0; 2nd half circle`)
+      if (ccw) {
+        g(`G3 F${xyFeed/2} X-${x} Y0 I-${x} J0; 1st half circle`)
+        g(`G3 F${xyFeed/2} X${x} Y0 I${x} J0; 2nd half circle`)
+      } else {
+        g(`G2 F${xyFeed/2} X-${x} Y0 I-${x} J0; 1st half circle`)
+        g(`G2 F${xyFeed/2} X${x} Y0 I${x} J0; 2nd half circle`)
+      }
 
       // move back to center
       if (x > 0) {
@@ -139,10 +190,10 @@ function generateGCode(holeDiam, endmillDiam, zMovement, doc, woc, feedrate, rec
   g('; End of hole milling loop')
   if (x != x0 || y != y0)
     g(`G1 F${xyFeed} X${x0} Y${y0}; move to center of hole`)
-  g(`G0 Z${z0 + zSafe}; retracting back to z-safe`)
+  g(`G0 F1000 Z${z0 + zSafe}; retracting back to z-safe`)
   g('')
   g('M5 S0; Spindle Off')
-  g('; Job completed')
+  g('; Job complete')
 
   // replace code in G-Code editor
   editor.session.setValue(gCode);
@@ -185,6 +236,7 @@ var prefs = {
   holeDepth: 1,
   doc: 100,
   woc: 20,
+  wocFinish: 2,
   feedrate: 500,
   receipe: "spiral-ccw"
 }
@@ -202,10 +254,11 @@ Metro.dialog.create({
     genInputHtml('Cutting depth', 'zMovement', prefs.holeDepth, 'fa-ruler', '', 'mm') +
     genInputHtml('DOC', 'doc', prefs.doc, 'fa-align-justify', 'depth of cut (10% - 200% of endmill diameter)', "%") +
     genInputHtml('WOC', 'woc', prefs.woc, 'fa-align-justify', 'width of cut (5% - 30% of endmill diameter)', "%") +
-    //    genInputHtml('Step-down', 'stepDown', 1, 'fa-align-justify', '') +
-    genInputHtml('Feedrate', 'feedrate', prefs.feedrate, 'fa-running', 'How fast to move the endmill in milling operation', 'nn/min') +
-    genSelectHtml('Receipe', 'receipe', ['circle', 'spiral cw', 'spiral ccw'], prefs.receipe, 'used to remove the material'),
-  width: 640,
+    genInputHtml('Finish WOC', 'wocFinish', prefs.wocFinish, 'fa-align-justify', 'width of cut for finish path (0 disables it)', "%") +
+    genInputHtml('Feedrate', 'feedrate', prefs.feedrate, 'fa-running', 'How fast to move the endmill in milling operation', 'mm/min') +
+    genSelectHtml('Receipe', 'receipe', ['circle-cw-cw', 'circle-cw-ccw', 'circle-ccw-cw', 'circle-ccw-ccw', 
+    'spiral-cw-cw', 'spiral-cw-ccw', 'spiral-ccw-cw', 'spiral-ccw-ccw',], prefs.receipe, 'used to remove the material'),
+  width: 700,
   actions: [
     {
       caption: "Generate G-Code",
@@ -216,10 +269,10 @@ Metro.dialog.create({
         prefs.holeDepth = parseFloat($("#zMovement").val())
         prefs.doc = parseFloat($("#doc").val())
         prefs.woc = parseFloat($("#woc").val())
-        //const stepDown = parseFloat($("#stepDown").val())
+        prefs.wocFinish = parseFloat($("#wocFinish").val())
         prefs.feedrate = parseInt($("#feedrate").val())
         prefs.receipe = $('#receipe').val();
-        const gCode = generateGCode(prefs.holeDiam, prefs.endmillDiam, prefs.holeDepth, prefs.doc, prefs.woc, prefs.feedrate, prefs.receipe)
+        const gCode = generateGCode(prefs.holeDiam, prefs.endmillDiam, prefs.holeDepth, prefs.doc, prefs.woc, prefs.wocFinish, prefs.feedrate, prefs.receipe)
         if (gCode)
           savePrefs();
       }
