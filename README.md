@@ -19,24 +19,39 @@ Note: If the hole diameter is smaller than the endmill diameter, then the macro 
 ```
 If the hole diameter is equal to the endmill diameter, then the operation is equal to a drilling operation (i.e. moving the endmill vertical in z direction only). Otherwise, the complete hole body will be milled.
 
-### Overlapping
-When milling the hole an overlap of 50% is used for each circle. E.g. when using a 4mm endmill, the overlap will be 2mm.
+```
+Note: Depending on your machine setup and material, the resulting hole might be smaller or even larger than the target. In this case adjust the target diameter by the messured difference.
+```
+### Receipe
+There are two base receipe implemented by which the area is being milled: 
+* `circle`: by milling in concentric growing circles. <br><img src="doc/receipe-circle.png" width="200"> 
+* `spiral`: by milling in a (approximated) spiral. <br><img src="doc/receipe-spiral.png" width="200"> 
 
-### Step-Down
-The milling opereation will be done in vertial layers, starting at 0. The `step-down` defines the distance between the layers. If the `step-down` is larger than the hole deepth, it will be reduced to the deepth. The same is true if the remaining height of the last layer is less then the `step-down` height.
+Each has two additional options which steers the milling direction:
+* `cw`: clock-wise milling (usually against the rotation of the endmill), aka *conventional milling*
+* `ccw`: counter-clock-wise milling (usually towards the endmill rotation), aha *climb milling*
 
-### Direction
-Three options exists on how to processs the layers:
-* `zig-zag`: mill down on the current position, either in the center of the outer edge.
-* `to-center`: always mill down on the outer edge, then mill in center direction
-* `to-outer`: always mill down in the center, then mill to the outer edge.
+The milling direction can be defined for the rough cutting, as well for the finishing process if not disabled. As a result the receipes are following the following naming convention:
+```
+<milling methon>-<rough cut direction>-<finishing direction>
+e.g.
+spiral-ccw-cw
+```
 
-Using `zig-zag` provides the fastest path, but might lead to steps on the holes outer surface. `to-outer` can lead to a hole of a slightly smaller diameter, dependeing your maching. `to-center` might lead to the oposite.
+### Cutting depth
+Defines how deep to mill the pocket / hole into the material. Usually, this is being dome in multiple layers (see DOC).
 
-You should test your machine with some sample mills to determine if you need to extend / reduce the target hole diameter.
+### DOC (depth of cut)
+Milling is being done in layers. The DOC defines how deep the endmill mills in each layer (might be lower for the final layer). This depth is expressed as a percentage of the endmill diameter. U 
 
-### Counter-Clock-Wise
-The generated gcode mills in circles, counter-clock-wise.
+### WOC (width of cut)
+The layers being milled will cut the material based on the receipe selected. The WOC defined how deep the endmill mills into the material on the current depth layer. Again, this value is given as a percentage to the endmill diameter.
+
+### Finish WOC
+If you prefer to split the milling operation into a rough cutting and finishing part, you cen defined the WOC used for the very last circle being milled. A value of 0 disbles the finishing loop.
+
+### Feedrate
+The maximum feedrate used during the milling operation.
 
 # Development
 For the development I use `VS Code` running on linux. As the macros in `OpenBuild CONTROL` are stored in an internal DB, you need to copy and paste your modified code into one macro.
@@ -45,6 +60,10 @@ For the development I use `VS Code` running on linux. As the macros in `OpenBuil
 There is a testsuite based on `jest` to test if the generated g-code fits the expectations. The setup is based on `npm`. If you want to run the tests, you also need to install the development dependencies with `npm install`.
 
 To run the tests themself, simply start `npm test`.
+
+```
+Note: As of now the tests are disabled, as they are based on an older set of receipes.
+```
 
 ## Fixes 
 Whenever you perform fixes, it is a good idea to start to add a test which should fail with the existing code. Next, fix the bug. Once the bug is fixed, your new / adjusted test should no longer fail.
